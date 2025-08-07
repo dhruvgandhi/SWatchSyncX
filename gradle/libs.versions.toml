@@ -5,6 +5,7 @@ healthServicesClient = "1.0.0"
 kotlin = "2.2.0"
 kotlinxCoroutinesAndroid = "1.10.2"
 kotlinxCoroutinesGuava = "1.10.2"
+material = "1.8.3"
 playServicesWearable = "19.0.0"
 composeBom = "2025.07.00"
 composeMaterial = "1.4.1"
@@ -19,6 +20,7 @@ guava = { module = "com.google.guava:guava", version.ref = "guava" }
 health-services-client = { module = "androidx.health:health-services-client", version.ref = "healthServicesClient" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
 kotlinx-coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "kotlinxCoroutinesGuava" }
+material = { module = "androidx.compose.material:material", version.ref = "material" }
 play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 ui = { group = "androidx.compose.ui", name = "ui" }

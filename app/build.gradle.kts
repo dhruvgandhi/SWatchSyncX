@@ -64,4 +64,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.guava)
     implementation(libs.kotlinx.coroutines.guava) // To await ListenableFuture
+    implementation(libs.material)
 }

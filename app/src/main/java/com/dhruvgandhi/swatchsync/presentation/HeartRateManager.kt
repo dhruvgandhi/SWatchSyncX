@@ -1,47 +1,56 @@
-
 package com.dhruvgandhi.swatchsync.presentation
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.health.services.client.HealthServices
 import androidx.health.services.client.PassiveListenerService
+import androidx.health.services.client.data.PassiveListenerConfig
 import androidx.health.services.client.data.DataPointContainer
 import androidx.health.services.client.data.DataType
-import androidx.health.services.client.data.PassiveListenerConfig
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.guava.await
+import java.time.LocalDateTime
 
-class HeartRatePassiveListenerService : PassiveListenerService() {
-    companion object {
-        val heartRateFlow = MutableStateFlow(0.0)
+data class HeartRateState(
+    val heartRate: Double = 0.0,
+    val lastUpdated: LocalDateTime = LocalDateTime.MIN
+)
+object HeartRateInfo {
+    private val _state = MutableStateFlow(HeartRateState())
+    val state: StateFlow<HeartRateState> = _state
+
+    fun update(heartRate: Double, time: LocalDateTime) {
+        _state.value = HeartRateState(heartRate, time)
     }
+}
+class HeartRatePassiveListenerService : PassiveListenerService() {
+
+
     override fun onNewDataPointsReceived(dataPoints: DataPointContainer) {
         val heartRateData = dataPoints.getData(DataType.HEART_RATE_BPM)
         if (heartRateData.isNotEmpty()) {
             val latestHeartRate = heartRateData.last().value
-            heartRateFlow.value = latestHeartRate
+            val now = LocalDateTime.now()
+            HeartRateInfo.update(latestHeartRate, now)
             Log.d("HeartRate", "Passive HR update: $latestHeartRate BPM")
         }
     }
 }
 
 class HeartRateManager(private val context: Context) {
-
     private val healthServicesClient = HealthServices.getClient(context)
     private val passiveMonitoringClient = healthServicesClient.passiveMonitoringClient
-
     private val _heartRate = MutableStateFlow(0.0)
+    private val _lastUpdated = MutableStateFlow(LocalDateTime.MIN)
     val heartRate: StateFlow<Double> = _heartRate
 
     private val _isMonitoring = MutableStateFlow(false)
     val isMonitoring: StateFlow<Boolean> = _isMonitoring
 
-    // CoroutineScope you can tie to Service, ViewModel, or App scope appropriately
     private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     fun startMonitoring() {
@@ -55,10 +64,15 @@ class HeartRateManager(private val context: Context) {
                     config
                 ).await()
                 _isMonitoring.value = true
-                // Forward passive listener updates to local flow
-                HeartRatePassiveListenerService.heartRateFlow.collect { bpm ->
-                    _heartRate.value = bpm
+
+//                HeartRatePassiveListenerService.heartRateFlow.collect { bpm ->
+//                    _heartRate.value = bpm
+//                }
+                HeartRateInfo.state.collect {
+                    hrx->
+                    _heartRate.value = hrx.heartRate
                 }
+
             } catch (e: Exception) {
                 _isMonitoring.value = false
                 Log.e("HeartRateManager", "Failed to start passive HR monitoring", e)
