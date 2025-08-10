@@ -15,30 +15,81 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.guava.await
 import java.time.LocalDateTime
 
-data class HeartRateState(
-    val heartRate: Double = 0.0,
+
+data class FitnessData(
+    val heartRate: Double = Double.MIN_VALUE,
+    val stepCount: Long = Long.MIN_VALUE,  // Add step count
     val lastUpdated: LocalDateTime = LocalDateTime.MIN
 )
-object HeartRateInfo {
-    private val _state = MutableStateFlow(HeartRateState())
-    val state: StateFlow<HeartRateState> = _state
 
-    fun update(heartRate: Double, time: LocalDateTime) {
-        _state.value = HeartRateState(heartRate, time)
+object FitnessInfo {  // Renamed from HeartRateInfo
+    private val _state = MutableStateFlow(FitnessData())
+    val state: StateFlow<FitnessData> = _state
+
+    fun updateHeartRate(heartRate: Double, time: LocalDateTime) {
+        _state.value = _state.value.copy(heartRate = heartRate, lastUpdated = time)
+    }
+
+    fun updateStepCount(steps: Long, time: LocalDateTime) {
+        _state.value = _state.value.copy(stepCount = steps, lastUpdated = time)
+    }
+
+    fun updateAll(heartRate: Double, steps: Long, time: LocalDateTime) {
+        _state.value = FitnessData(heartRate, steps, time)
     }
 }
+
 class HeartRatePassiveListenerService : PassiveListenerService() {
 
 
     override fun onNewDataPointsReceived(dataPoints: DataPointContainer) {
+        val now = LocalDateTime.now()
+
+
+        // Get heart rate points and filter out zero/invalid values
         val heartRateData = dataPoints.getData(DataType.HEART_RATE_BPM)
+            .map { it.value }
+            .filter { it in 25.0..250.0 } // allow realistic human range
+
         if (heartRateData.isNotEmpty()) {
-            val latestHeartRate = heartRateData.last().value
-            val now = LocalDateTime.now()
-            HeartRateInfo.update(latestHeartRate, now)
-            Log.d("HeartRate", "Passive HR update: $latestHeartRate BPM")
+            // --- Median for stable current value ---
+            val sorted = heartRateData.sorted()
+            val median = if (sorted.size % 2 == 1) {
+                sorted[sorted.size / 2]
+            } else {
+                (sorted[sorted.size / 2 - 1] + sorted[sorted.size / 2]) / 2
+            }
+
+            // --- Max in current batch (for alerting) ---
+            val maxReading = heartRateData.maxOrNull()
+
+            // --- Optional: detect sustained low or high HR ---
+            val lowThreshold = 40.0
+            val highThreshold = 180.0
+            val lowCount = heartRateData.count { it < lowThreshold }
+            val highCount = heartRateData.count { it > highThreshold }
+
+            // Update main fitness state with median value
+            FitnessInfo.updateHeartRate(median, now)
+
+            // Example: log alerts (or trigger an event)
+            if (lowCount > heartRateData.size / 2) {
+                Log.w("FitnessData", "⚠ Sustained LOW heart rate detected: median=$median")
+            }
+            if (highCount > heartRateData.size / 2) {
+                Log.w("FitnessData", "⚠ Sustained HIGH heart rate detected: median=$median")
+            }
+        }
+
+        // Handle step count data
+        val stepData = dataPoints.getData(DataType.STEPS_DAILY)
+        if (stepData.isNotEmpty()) {
+            val latestSteps = stepData.last().value.toLong()
+            FitnessInfo.updateStepCount(latestSteps, now)
+            Log.d("FitnessData", "Steps update: $latestSteps steps")
         }
     }
+
 }
 
 class HeartRateManager(private val context: Context) {
@@ -57,7 +108,7 @@ class HeartRateManager(private val context: Context) {
         managerScope.launch {
             try {
                 val config = PassiveListenerConfig.builder()
-                    .setDataTypes(setOf(DataType.HEART_RATE_BPM))
+                    .setDataTypes(setOf(DataType.HEART_RATE_BPM, DataType.STEPS_DAILY))
                     .build()
                 passiveMonitoringClient.setPassiveListenerServiceAsync(
                     HeartRatePassiveListenerService::class.java,
@@ -68,8 +119,7 @@ class HeartRateManager(private val context: Context) {
 //                HeartRatePassiveListenerService.heartRateFlow.collect { bpm ->
 //                    _heartRate.value = bpm
 //                }
-                HeartRateInfo.state.collect {
-                    hrx->
+                FitnessInfo.state.collect { hrx ->
                     _heartRate.value = hrx.heartRate
                 }
 

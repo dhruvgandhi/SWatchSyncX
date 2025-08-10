@@ -23,6 +23,7 @@ import androidx.core.app.ActivityCompat
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.compose.material.darkColors
+import androidx.compose.ui.AbsoluteAlignment
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -35,12 +36,12 @@ class MainActivity : ComponentActivity() {
             android.Manifest.permission.BODY_SENSORS,
             android.Manifest.permission.BLUETOOTH_CONNECT,
             android.Manifest.permission.BLUETOOTH_ADVERTISE,
-            android.Manifest.permission.BLUETOOTH_SCAN
+            android.Manifest.permission.BLUETOOTH_SCAN,
+            android.Manifest.permission.ACTIVITY_RECOGNITION
         )
     } else {
         TODO("VERSION.SDK_INT < S")
     }
-
 
 
     //Theme code
@@ -93,10 +94,13 @@ fun HeartRateScreen(heartRateManager: HeartRateManager) {
     heartRateManager.startMonitoring()
     val heartRate by heartRateManager.heartRate.collectAsState()
     val isMonitoring by heartRateManager.isMonitoring.collectAsState()
-    val heartRateState by HeartRateInfo.state.collectAsState()
+    val fitnessInfoState by FitnessInfo.state.collectAsState()
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)
-        ){
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -104,33 +108,38 @@ fun HeartRateScreen(heartRateManager: HeartRateManager) {
 
         ) {
             Text(
-                text = "❤️",
+                text = "📲",
                 style = MaterialTheme.typography.title1
             )
 
             Spacer(modifier = Modifier.height(16.dp))
+            Text(text = "🚶‍♂️", style = MaterialTheme.typography.body1)
+            Spacer(modifier = Modifier.height(5.dp))
             Text(
-                text = "Heart Rate",
-                style = MaterialTheme.typography.body1
+                text = if (fitnessInfoState.stepCount != Long.MIN_VALUE) "${fitnessInfoState.stepCount}" else "️--",
+                style = MaterialTheme.typography.body2
             )
+            
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = "❤️", style = MaterialTheme.typography.body1)
+
             Spacer(modifier = Modifier.height(5.dp))
 
             Text(
-                text = if (heartRateState.heartRate > 0) "${heartRateState.heartRate.toInt()} BPM" else "--",
+                text = if (fitnessInfoState.heartRate != Double.MIN_VALUE) "${fitnessInfoState.heartRate.toInt()} BPM" else "--",
                 style = MaterialTheme.typography.body2
 
             )
 
 
+
+
             Spacer(modifier = Modifier.height(16.dp))
+
             Text(
-                text = "Last Updated",
-                style = MaterialTheme.typography.body1
-            )
-            Spacer(modifier = Modifier.height(5.dp))
-            Text(
-                text = if (heartRateState.lastUpdated == LocalDateTime.MIN) "--" else
-                    "${heartRateState.lastUpdated.format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"))}",
+                text = if (fitnessInfoState.lastUpdated == LocalDateTime.MIN) "🕵️‍♀️ --" else
+                    "🕵️‍♀️ ${fitnessInfoState.lastUpdated.format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"))}",
                 style = MaterialTheme.typography.body2
             )
             Spacer(modifier = Modifier.height(16.dp))
