@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -24,6 +25,7 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.compose.material.darkColors
 import androidx.compose.ui.AbsoluteAlignment
+import androidx.core.content.ContextCompat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -32,13 +34,19 @@ class MainActivity : ComponentActivity() {
     private lateinit var heartRateManager: HeartRateManager
     private val REQUEST_CODE_PERMISSIONS = 1001
     private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        arrayOf(
-            android.Manifest.permission.BODY_SENSORS,
-            android.Manifest.permission.BLUETOOTH_CONNECT,
-            android.Manifest.permission.BLUETOOTH_ADVERTISE,
-            android.Manifest.permission.BLUETOOTH_SCAN,
-            android.Manifest.permission.ACTIVITY_RECOGNITION
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            arrayOf(
+                android.Manifest.permission.BODY_SENSORS,
+                android.Manifest.permission.BLUETOOTH_CONNECT,
+                android.Manifest.permission.BLUETOOTH_ADVERTISE,
+                android.Manifest.permission.BLUETOOTH_SCAN,
+                android.Manifest.permission.ACTIVITY_RECOGNITION,
+                android.Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC,
+                android.Manifest.permission.FOREGROUND_SERVICE
+            )
+        } else {
+            TODO("VERSION.SDK_INT < UPSIDE_DOWN_CAKE")
+        }
     } else {
         TODO("VERSION.SDK_INT < S")
     }
@@ -67,25 +75,34 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        if (!allPermissionsGranted()) {
-            ActivityCompat.requestPermissions(
-                this,
-                REQUIRED_PERMISSIONS,
-                REQUEST_CODE_PERMISSIONS
-            )
-        }
-        heartRateManager = HeartRateManager(this)
-
-        // Start Bluetooth service
-        val serviceIntent = Intent(this, HeartRateBluetoothService::class.java)
-        startService(serviceIntent)
-
-        setContent {
-            MyDarkTheme {
-                HeartRateScreen(heartRateManager)
+        try{
+            super.onCreate(savedInstanceState)
+            if (!allPermissionsGranted()) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    REQUIRED_PERMISSIONS,
+                    REQUEST_CODE_PERMISSIONS
+                )
             }
+            heartRateManager = HeartRateManager(this)
+
+            // Start Bluetooth service
+            //val serviceIntent = Intent(this, HeartRateBluetoothService::class.java)
+            //startService(serviceIntent)
+
+            val serviceIntent = Intent(this, HeartRateBluetoothService::class.java)
+            ContextCompat.startForegroundService(this, serviceIntent)
+
+
+            setContent {
+                MyDarkTheme {
+                    HeartRateScreen(heartRateManager)
+                }
+            }
+        }catch (ex:Exception){
+            Log.e("swatch",ex.message.toString())
         }
+
     }
 }
 
